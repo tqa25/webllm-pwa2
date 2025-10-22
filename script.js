@@ -1,81 +1,71 @@
-import { CreateMLCEngine } from "https://esm.run/@mlc-ai/web-llm";
+// Import ESM chính thức từ MLC
+import { CreateMLCEngine } from "https://esm.sh/@mlc-ai/web-llm@0.2.79";
 
-const $ = (s)=>document.querySelector(s);
-const messagesEl = $("#messages");
-const inputEl = $("#input");
-const sendBtn = $("#send");
-const statusEl = $("#status");
-const modelSel = $("#model");
-const maxTokEl = $("#maxTokens");
+const $ = (id) => document.getElementById(id);
+const modelSel   = $("model");
+const maxTokens  = $("maxTokens");
+const initBtn    = $("initBtn");
+const sendBtn    = $("sendBtn");
+const inputEl    = $("input");
+const outputEl   = $("output");
+const statusEl   = $("status");
+const progressEl = $("progress");
 
 let engine = null;
-let currentModel = modelSel.value;
-let initializing = false;
 
-function addMsg(text, who="bot"){
-  const div = document.createElement("div");
-  div.className = "msg " + (who==="user"?"user":"bot");
-  div.innerText = text;
-  messagesEl.appendChild(div);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-  return div;
+function setStatus(text) { statusEl.textContent = text; }
+function setProgress(v) {
+  if (v == null) { progressEl.hidden = true; return; }
+  progressEl.hidden = false; progressEl.value = v;
 }
 
-async function ensureEngine(){
-  if (engine && currentModel === modelSel.value) return;
-  if (initializing) return;
-  initializing = true;
-  statusEl.textContent = "Đang tải model… (lần đầu cần mạng)";
-  currentModel = modelSel.value;
-  engine = await CreateMLCEngine({
-    model: currentModel,
-    // optional: you can host your own model shards by providing base_url here.
-    // e.g., model_id: "...", model_url: "https://your.cdn/path/"
-    // See WebLLM docs for details.
-  }, { initProgressCallback: (p)=>{ statusEl.textContent = `Tải: ${Math.round(p*100)}%`; } });
-  statusEl.textContent = "Sẵn sàng (offline)";
-  initializing = false;
-}
+async function initEngine() {
+  try {
+    setStatus("Đang khởi tạo… (chuẩn bị tải model)");
+    setProgress(0);
 
-// Handle model change
-modelSel.addEventListener("change", async ()=>{
-  engine = null;
-  await ensureEngine();
-});
-
-async function send(){
-  const text = inputEl.value.trim();
-  if (!text) return;
-  addMsg(text, "user");
-  inputEl.value = "";
-  await ensureEngine();
-
-  const maxTokens = Math.max(32, Math.min(2048, Number(maxTokEl.value)||256));
-
-  const place = addMsg("", "bot");
-  try{
-    const stream = await engine.chat.completions.create({
-      messages: [{ role: "user", content: text }],
-      stream: true,
-      temperature: 0.6,
-      max_tokens: maxTokens
+    const model_id = modelSel.value; // PHẢI có hậu tố -MLC
+    engine = await CreateMLCEngine(model_id, {
+      initProgressCallback: ({ progress, text }) => {
+        setStatus(text || `Đang tải model: ${(progress*100).toFixed(1)}%`);
+        if (typeof progress === "number") setProgress(progress);
+      },
     });
-    for await (const chunk of stream){
-      const delta = chunk?.choices?.[0]?.delta?.content ?? "";
-      place.textContent += delta;
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-  }catch(err){
-    place.textContent = "Lỗi: " + (err?.message || err);
+
+    setProgress(null);
+    setStatus("Đã sẵn sàng.");
+    sendBtn.disabled = false;
+  } catch (err) {
+    setProgress(null);
+    setStatus("Lỗi khởi tạo: " + (err && err.message ? err.message : err));
+    console.error(err);
   }
 }
 
-sendBtn.addEventListener("click", send);
-inputEl.addEventListener("keydown", (e)=>{
-  if (e.key === "Enter" && !e.shiftKey){
-    e.preventDefault(); send();
-  }
-});
+async function send() {
+  if (!engine) return;
+  const user = inputEl.value.trim();
+  if (!user) return;
 
-// Boot
-ensureEngine().catch(err=>{ statusEl.textContent = "Lỗi khởi tạo"; console.error(err); });
+  outputEl.textContent = "Đang suy nghĩ…";
+  const messages = [
+    { role: "system", content: "You are a helpful assistant." },
+    { role: "user",   content: user }
+  ];
+
+  let reply = "";
+  try {
+    const stream = await engine.chat.completions.create({
+      messages, stream: true, max_tokens: Number(maxTokens.value) || 256,
+    });
+    for await (const chunk of stream) {
+      reply += chunk.choices?.[0]?.delta?.content || "";
+      outputEl.textContent = reply;
+    }
+  } catch (err) {
+    outputEl.textContent = "Lỗi generate: " + (err?.message || err);
+  }
+}
+
+initBtn.addEventListener("click", initEngine);
+sendBtn.addEventListener("click", send);
