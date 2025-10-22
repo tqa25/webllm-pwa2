@@ -1,0 +1,16 @@
+{
+  "name": "WebLLM PWA – ROG Phone 6",
+  "short_name": "WebLLM PWA",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='48' fill='%230f172a'/%3E%3Cpath d='M56 160c0-44 36-80 80-80h16v24h-16a56 56 0 0 0-56 56v24H56z' fill='%2322c55e'/%3E%3Cpath d='M200 96c0 44-36 80-80 80h-16v-24h16a56 56 0 0 0 56-56V72h24z' fill='%23a7f3d0'/%3E%3C/svg%3E",
+      "sizes": "256x256",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
