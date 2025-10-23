@@ -1,0 +1,33 @@
+{
+  "model_list": [
+    {
+      "model_url": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/Llama-3.2-1B-Instruct-q4f32_0-MLC/params/ndarray-cache.json",
+      "model_lib_url": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/Llama-3.2-1B-Instruct-q4f32_0-MLC/Llama-3.2-1B-Instruct-q4f32_0-MLC-webgpu.wasm",
+      "model_id": "Llama-3.2-1B-Instruct-q4f32_0-MLC",
+      "model_category": "Llama",
+      "vram_required_MB": 1000,
+      "low_memory_msa_id": "Llama-3.2-1B-Instruct-q4f16_1-MLC"
+    },
+    {
+      "model_url": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/Phi-2-q4f32_0-MLC/params/ndarray-cache.json",
+      "model_lib_url": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/Phi-2-q4f32_0-MLC/Phi-2-q4f32_0-MLC-webgpu.wasm",
+      "model_id": "Phi-2-q4f32_0-MLC",
+      "model_category": "Phi",
+      "vram_required_MB": 1600,
+      "low_memory_msa_id": "Phi-2-q4f16_1-MLC"
+    },
+    {
+      "model_url": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC/params/ndarray-cache.json",
+      "model_lib_url": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC/TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC-webgpu.wasm",
+      "model_id": "TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC",
+      "model_category": "TinyLlama",
+      "vram_required_MB": 1000,
+      "low_memory_msa_id": "TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC"
+    }
+  ],
+  "model_lib_map": {
+    "Llama-3.2-1B-Instruct-q4f32_0-MLC": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/Llama-3.2-1B-Instruct-q4f32_0-MLC/Llama-3.2-1B-Instruct-q4f32_0-MLC-webgpu.wasm",
+    "Phi-2-q4f32_0-MLC": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/Phi-2-q4f32_0-MLC/Phi-2-q4f32_0-MLC-webgpu.wasm",
+    "TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC": "https://huggingface.co/mlc-ai/web-llm-models/resolve/main/TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC/TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC-webgpu.wasm"
+  }
+}
