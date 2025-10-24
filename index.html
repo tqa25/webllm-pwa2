@@ -1,55 +1,84 @@
-<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WebLLM PWA (offline) – ROG Phone 6</title>
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <!-- BẮT BUỘC cho GitHub Pages: vá COOP/COEP -->
-  <script src="./coi-serviceworker.min.js"></script>
-  <style>
-    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    body { max-width: 720px; margin: 0 auto; padding: 16px; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    select, input, button, textarea { font: inherit; padding: 8px; }
-    textarea { width: 100%; min-height: 160px; }
-    progress { width: 100%; height: 10px; }
-    .muted { color: #666; font-size: 14px; }
-  </style>
-</head>
-<body>
-  <h1>WebLLM PWA (offline) – ROG Phone 6</h1>
-  <p class="muted">Lần đầu cần Internet để tải model → sau đó chạy offline.</p>
+<!DOCTYPE html>
 
-  <div class="row">
-    <label>Model</label>
-    <select id="model">
-      <option value="Llama-3.2-1B-Instruct-q4f32_0-MLC">Llama-3.2-1B-Instruct-q4f32_0-MLC</option>
-      <option value="Phi-2-q4f32_0-MLC">Phi-2-q4f32_0-MLC</option>
-      <!-- Đã sửa value ở đây để khớp với model_id trong mlc-chat-config.json -->
-      <option value="TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC">TinyLlama-1.1B-Chat-v1.0-q4f32_0-MLC</option>
-    </select>
 
-    <label>Max tokens</label>
-    <input id="maxTokens" type="number" min="32" max="1024" step="32" value="256" />
-    <button id="initBtn">Khởi tạo</button>
-  </div>
+<section class="card">
+<h2>Chọn / nạp mô hình</h2>
+<label>
+Preset model:
+<select id="modelSelect">
+<option value="Llama-3.2-1B-Instruct-q4f32_1-MLC">Llama-3.2‑1B‑Instruct (q4)</option>
+<option value="Phi-2-q4f16_1-MLC">Phi‑2 (q4)</option>
+<option value="TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC">TinyLlama‑1.1B‑Chat (q4)</option>
+</select>
+</label>
 
-  <div id="status" class="muted" style="margin:8px 0">Chưa khởi tạo</div>
-  <progress id="progress" max="1" value="0" hidden></progress>
 
-  <textarea id="input" placeholder="Nhập câu hỏi..."></textarea>
-  <button id="sendBtn" disabled>Gửi</button>
+<div class="grid2">
+<div>
+<label>Custom model base URL (tùy chọn)
+<input id="baseUrl" type="url" placeholder="http://localhost:8000/my-model/" />
+</label>
+<small>Ví dụ: thư mục chứa <code>params_shard_*.bin</code>, <code>mlc-chat-config.json</code>, <code>tokenizer.json</code>...</small>
+</div>
+<div>
+<label>Tải model từ file (tùy chọn)
+<input id="filePicker" type="file" multiple />
+</label>
+<small>Chọn nhiều file shard nếu bạn đã tải thủ công vào máy.</small>
+</div>
+</div>
 
-  <pre id="output"></pre>
 
-  <script type="module" src="./script.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js');
-    }
-  </script>
+<div class="actions">
+<button id="btnPreload">Nạp model</button>
+<button id="btnReset">Xóa cache model</button>
+</div>
 
-  <p class="muted">Mẹo: Chrome menu ⋮ → Thêm vào Màn hình chính để dùng như app.</p>
+
+<progress id="progress" max="1" value="0"></progress>
+<pre id="log" class="log"></pre>
+</section>
+
+
+<section class="card">
+<h2>Chat (offline)</h2>
+<div id="chatBox"></div>
+<div class="row">
+<input id="userInput" placeholder="Nhập câu hỏi..." />
+<button id="sendBtn">Gửi</button>
+</div>
+</section>
+
+
+<footer>
+<small>Tip: lần đầu cần mạng để tải model; lần sau có thể rút mạng và dùng offline.</small>
+</footer>
+
+
+<script>
+// Đăng ký Service Worker để offline UI
+if ('serviceWorker' in navigator) {
+window.addEventListener('load', () => {
+navigator.serviceWorker.register('./service-worker.js');
+});
+}
+
+
+// Sự kiện "cài PWA"
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+e.preventDefault();
+deferredPrompt = e;
+const btn = document.getElementById('installBtn');
+btn.hidden = false;
+btn.addEventListener('click', async () => {
+btn.hidden = true;
+deferredPrompt.prompt();
+await deferredPrompt.userChoice;
+deferredPrompt = null;
+});
+});
+</script>
+<script type="module" src="./main.js"></script>
 </body>
 </html>
