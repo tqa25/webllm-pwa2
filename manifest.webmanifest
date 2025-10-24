@@ -1,12 +1,12 @@
 {
-"name": "WebLLM PWA (Offline)",
-"short_name": "WebLLM PWA",
-"start_url": ".",
-"display": "standalone",
-"background_color": "#0f172a",
-"theme_color": "#0f172a",
-"icons": [
-{ "src": "icon-192.png", "type": "image/png", "sizes": "192x192" },
-{ "src": "icon-512.png", "type": "image/png", "sizes": "512x512" }
-]
+  "name": "WebLLM PWA (Offline)",
+  "short_name": "WebLLM PWA",
+  "start_url": "/webllm-pwa2/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ]
 }
