@@ -56,13 +56,6 @@ Preset model:
 
 
 <script>
-// Đăng ký Service Worker để offline UI
-if ('serviceWorker' in navigator) {
-window.addEventListener('load', () => {
-navigator.serviceWorker.register('./service-worker.js');
-});
-}
-
 
 // Sự kiện "cài PWA"
 let deferredPrompt;
