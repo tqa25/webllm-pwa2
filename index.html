@@ -80,5 +80,16 @@ deferredPrompt = null;
 });
 </script>
 <script type="module" src="./main.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    // Đăng ký SW với scope đúng thư mục Pages: /webllm-pwa2/
+    navigator.serviceWorker.register('/webllm-pwa2/sw.js', { scope: '/webllm-pwa2/' })
+      .then(r => console.log('SW registered:', r.scope))
+      .catch(err => console.error('SW failed:', err));
+  });
+}
+</script>
+
 </body>
 </html>
