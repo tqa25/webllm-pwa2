@@ -1,37 +1,46 @@
-const CACHE = 'webllm-pwa-v1';
-const APP_SHELL = [
-  '/webllm-pwa2/',
-  '/webllm-pwa2/index.html',
-  '/webllm-pwa2/style.css',
-  '/webllm-pwa2/script.js',
-  '/webllm-pwa2/manifest.webmanifest',
-  '/webllm-pwa2/icon-192.png',
-  '/webllm-pwa2/icon-512.png'
+// Very small PWA shell cache (do NOT cache model shards)
+const CACHE_NAME = "webllm-shell-v1";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./style.css",
+  "./main.js",
+  "./manifest.webmanifest",
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)));
-});
-
-self.addEventListener('activate', (e) => {
+self.addEventListener("install", (e)=>{
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS))
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
-  // Cache-first cho app shell
-  if (APP_SHELL.includes(url.pathname)) {
-    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
-    return;
-  }
-  // Network-first cho phần khác (để HTTP cache xử lý file model lớn)
-  e.respondWith(
-    fetch(e.request).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy));
-      return res;
-    }).catch(() => caches.match(e.request))
+self.addEventListener("activate", (e)=>{
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k))
+    ))
   );
+});
+
+self.addEventListener("fetch", (e)=>{
+  const url = new URL(e.request.url);
+
+  // Bỏ qua các request model shard/huggingface/mlc-ai… để WebLLM + HTTP cache tự xử lý
+  if (/(\bmlc-ai\b|\bhuggingface\b|\bmodel\b|\bweb-llm\b)/i.test(url.hostname + url.pathname)) {
+    return; // network as-is
+  }
+
+  // Cache-first cho app shell
+  if (e.request.method === "GET") {
+    e.respondWith(
+      caches.match(e.request).then(resp => resp || fetch(e.request).then(r=>{
+        // optional: only cache same-origin
+        if (url.origin === location.origin) {
+          const rClone = r.clone();
+          caches.open(CACHE_NAME).then(c=>c.put(e.request, rClone));
+        }
+        return r;
+      }).catch(()=>caches.match("./index.html")))
+    );
+  }
 });
