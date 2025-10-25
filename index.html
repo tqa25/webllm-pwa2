@@ -1,95 +1,95 @@
-<!DOCTYPE html>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>WebLLM PWA — Chat</title>
 
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#0f172a" />
 
-<section class="card">
-<h2>Chọn / nạp mô hình</h2>
-<label>
-Preset model:
-<select id="modelSelect">
-<option value="Llama-3.2-1B-Instruct-q4f32_1-MLC">Llama-3.2‑1B‑Instruct (q4)</option>
-<option value="Phi-2-q4f16_1-MLC">Phi‑2 (q4)</option>
-<option value="TinyLlama-1.1B-Chat-v1.0-q4f16_1-MLC">TinyLlama‑1.1B‑Chat (q4)</option>
-</select>
-</label>
+  <!-- Base styles -->
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <!-- Sidebar / Header -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <h1>WebLLM Chat</h1>
+          <small class="muted">Local LLM on WebGPU</small>
+        </div>
+      </div>
 
+      <div class="panel">
+        <label for="modelSelect">Model</label>
+        <select id="modelSelect" class="select"></select>
 
-<div class="grid2">
-<div>
-<label>Custom model base URL (tùy chọn)
-<input id="baseUrl" type="url" placeholder="http://localhost:8000/my-model/" />
-</label>
-<small>Ví dụ: thư mục chứa <code>params_shard_*.bin</code>, <code>mlc-chat-config.json</code>, <code>tokenizer.json</code>...</small>
-</div>
-<div>
-<label>Tải model từ file (tùy chọn)
-<input id="filePicker" type="file" multiple />
-</label>
-<small>Chọn nhiều file shard nếu bạn đã tải thủ công vào máy.</small>
-</div>
-</div>
+        <div class="row">
+          <button id="btnInit" class="btn primary">Nạp model</button>
+          <button id="btnRelease" class="btn">Giải phóng</button>
+        </div>
 
+        <div class="progress-wrap">
+          <progress id="progress" value="0" max="1"></progress>
+          <div id="progressText" class="progress-text">Chưa tải</div>
+        </div>
 
-<div class="actions">
-<button id="btnPreload">Nạp model</button>
-<button id="btnReset">Xóa cache model</button>
-</div>
+        <div class="status">
+          <div>Trạng thái: <span id="statusBadge" class="badge gray">Chưa khởi tạo</span></div>
+          <div class="tiny muted" id="envInfo"></div>
+        </div>
+      </div>
 
+      <div class="panel">
+        <div class="row">
+          <button id="btnNew" class="btn">New Chat</button>
+          <button id="btnExport" class="btn">Export</button>
+        </div>
+        <div class="row">
+          <button id="btnTheme" class="btn">🌙/☀️</button>
+          <button id="btnClearCache" class="btn danger">Xoá lịch sử</button>
+        </div>
+      </div>
 
-<progress id="progress" max="1" value="0"></progress>
-<pre id="log" class="log"></pre>
-</section>
+      <div class="panel">
+        <h3>Log tải</h3>
+        <pre id="log" class="log"></pre>
+      </div>
+    </aside>
 
+    <!-- Chat area -->
+    <main class="main">
+      <header class="topbar">
+        <div class="chip" id="loadedModel">Chưa nạp model</div>
+        <div class="inline-stats" id="usageStats"></div>
+      </header>
 
-<section class="card">
-<h2>Chat (offline)</h2>
-<div id="chatBox"></div>
-<div class="row">
-<input id="userInput" placeholder="Nhập câu hỏi..." />
-<button id="sendBtn">Gửi</button>
-</div>
-</section>
+      <section id="messages" class="messages" aria-live="polite"></section>
 
+      <footer class="composer">
+        <textarea id="input" rows="1" placeholder="Nhập tin nhắn... (Shift+Enter để xuống dòng)"></textarea>
+        <div class="composer-actions">
+          <button id="btnStop" class="btn">Dừng</button>
+          <button id="btnSend" class="btn primary">Gửi</button>
+        </div>
+      </footer>
+    </main>
+  </div>
 
-<footer>
-<small>Tip: lần đầu cần mạng để tải model; lần sau có thể rút mạng và dùng offline.</small>
-</footer>
+  <!-- Main script -->
+  <script type="module" src="./main.js"></script>
 
-
-<script>
-// Đăng ký Service Worker để offline UI
-if ('serviceWorker' in navigator) {
-window.addEventListener('load', () => {
-navigator.serviceWorker.register('./service-worker.js');
-});
-}
-
-
-// Sự kiện "cài PWA"
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-e.preventDefault();
-deferredPrompt = e;
-const btn = document.getElementById('installBtn');
-btn.hidden = false;
-btn.addEventListener('click', async () => {
-btn.hidden = true;
-deferredPrompt.prompt();
-await deferredPrompt.userChoice;
-deferredPrompt = null;
-});
-});
-</script>
-<script type="module" src="./main.js"></script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    // Đăng ký SW với scope đúng thư mục Pages: /webllm-pwa2/
-    navigator.serviceWorker.register('/webllm-pwa2/sw.js', { scope: '/webllm-pwa2/' })
-      .then(r => console.log('SW registered:', r.scope))
-      .catch(err => console.error('SW failed:', err));
-  });
-}
-</script>
-
+  <!-- Minimal SW register (relative path for correct scope) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
+      });
+    }
+  </script>
 </body>
 </html>
