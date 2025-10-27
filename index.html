@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <!-- @version v1.2.1 (2025-10-27): merge Sessions + Diary into v1.1.1, sticky composer on empty chat, Stop button fix -->
+  <!-- @version v1.2.2 (2025-10-27): fixed PC sidebar width + toggle, stable chat width, dynamic WebLLM source selector -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>WebLLM PWA — Chat</title>
@@ -26,7 +26,6 @@
       <div class="panel">
         <h3>Sessions</h3>
         <div id="sessionList" class="session-list">
-          <!-- fixed diary -->
           <button class="session-item" data-id="__diary__">📒 Nhật ký</button>
         </div>
         <div class="row">
@@ -37,7 +36,13 @@
       </div>
 
       <div class="panel">
-        <label for="modelSelect">Model</label>
+        <label for="webllmSrc">Nguồn WebLLM</label>
+        <select id="webllmSrc" class="select" title="Chọn nguồn thư viện WebLLM">
+          <option value="auto" selected>Tự động (CDN)</option>
+          <option value="local">Local (./vendor/web-llm.mjs)</option>
+        </select>
+
+        <label for="modelSelect" style="margin-top:8px;">Model</label>
         <select id="modelSelect" class="select"></select>
 
         <div class="row">
@@ -70,33 +75,34 @@
       </div>
     </aside>
 
-    <!-- Backdrop for mobile -->
+    <!-- Backdrop (mobile) -->
     <div id="backdrop" class="backdrop"></div>
 
     <!-- Chat area -->
     <main class="main">
       <header class="topbar">
-        <button id="btnMenu" class="btn icon only-mobile" aria-label="Menu">☰</button>
+        <!-- Hiển thị trên PC và Mobile -->
+        <button id="btnMenu" class="btn icon" aria-label="Menu">☰</button>
         <div class="chip" id="loadedModel">Chưa nạp model</div>
         <div class="inline-stats" id="usageStats"></div>
       </header>
 
-      <!-- Empty welcome (shown only when no message in current session) -->
+      <!-- Empty welcome -->
       <section id="welcome" class="welcome" hidden>
         <h2>Xin chào 👋</h2>
-        <p>Bắt đầu hội thoại hoặc chọn 📒 <strong>Nhật ký</strong> để ghi chép cá nhân (lưu cục bộ, không gửi LLM).</p>
+        <p>Bắt đầu hội thoại hoặc chọn 📒 <strong>Nhật ký</strong> (lưu cục bộ, không gửi LLM).</p>
         <div class="welcome-actions">
           <button id="btnStartChat" class="btn primary">Bắt đầu chat mới</button>
           <button id="btnOpenDiary" class="btn">Mở Nhật ký</button>
         </div>
       </section>
 
-      <!-- Message list -->
+      <!-- Messages -->
       <section id="messages" class="messages" aria-live="polite"></section>
 
-      <!-- Composer always at bottom -->
+      <!-- Composer (luôn ở đáy) -->
       <footer class="composer">
-        <textarea id="input" rows="1" placeholder="Nhập tin nhắn... (Shift+Enter để xuống dòng)"></textarea>
+        <textarea id="input" rows="1" placeholder="Nhập tin nhắn... (Shift+Enter xuống dòng)"></textarea>
         <div class="composer-actions">
           <button id="btnStop" class="btn" disabled>Dừng</button>
           <button id="btnSend" class="btn primary">Gửi</button>
