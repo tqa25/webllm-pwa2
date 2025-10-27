@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <!-- @version v1.1.1 (2025-10-25): fix mobile sidebar toggle, strengthen debug log hooks -->
+  <!-- @version v1.2.1 (2025-10-27): merge Sessions + Diary into v1.1.1, sticky composer on empty chat, Stop button fix -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>WebLLM PWA — Chat</title>
@@ -19,6 +19,20 @@
         <div>
           <h1>WebLLM Chat</h1>
           <small class="muted">Local LLM on WebGPU</small>
+        </div>
+      </div>
+
+      <!-- Sessions -->
+      <div class="panel">
+        <h3>Sessions</h3>
+        <div id="sessionList" class="session-list">
+          <!-- fixed diary -->
+          <button class="session-item" data-id="__diary__">📒 Nhật ký</button>
+        </div>
+        <div class="row">
+          <button id="btnNewSession" class="btn">+ New chat</button>
+          <button id="btnRenameSession" class="btn">Đổi tên</button>
+          <button id="btnDeleteSession" class="btn danger">Xoá</button>
         </div>
       </div>
 
@@ -44,12 +58,9 @@
 
       <div class="panel">
         <div class="row">
-          <button id="btnNew" class="btn">New Chat</button>
           <button id="btnExport" class="btn">Export</button>
-        </div>
-        <div class="row">
           <button id="btnTheme" class="btn">🌙/☀️</button>
-          <button id="btnClearCache" class="btn danger">Xoá lịch sử</button>
+          <button id="btnClearAll" class="btn danger">Xoá tất cả</button>
         </div>
       </div>
 
@@ -70,12 +81,24 @@
         <div class="inline-stats" id="usageStats"></div>
       </header>
 
+      <!-- Empty welcome (shown only when no message in current session) -->
+      <section id="welcome" class="welcome" hidden>
+        <h2>Xin chào 👋</h2>
+        <p>Bắt đầu hội thoại hoặc chọn 📒 <strong>Nhật ký</strong> để ghi chép cá nhân (lưu cục bộ, không gửi LLM).</p>
+        <div class="welcome-actions">
+          <button id="btnStartChat" class="btn primary">Bắt đầu chat mới</button>
+          <button id="btnOpenDiary" class="btn">Mở Nhật ký</button>
+        </div>
+      </section>
+
+      <!-- Message list -->
       <section id="messages" class="messages" aria-live="polite"></section>
 
+      <!-- Composer always at bottom -->
       <footer class="composer">
         <textarea id="input" rows="1" placeholder="Nhập tin nhắn... (Shift+Enter để xuống dòng)"></textarea>
         <div class="composer-actions">
-          <button id="btnStop" class="btn">Dừng</button>
+          <button id="btnStop" class="btn" disabled>Dừng</button>
           <button id="btnSend" class="btn primary">Gửi</button>
         </div>
       </footer>
