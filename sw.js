@@ -1,62 +1,43 @@
-// sw.js
-const CACHE = 'webllm-pwa-v2';
-
-// Lấy base từ scope để khỏi sai đường dẫn khi chạy trên GitHub Pages
-const BASE = self.registration.scope; // ví dụ: https://tqa25.github.io/webllm-pwa2/
-
-// Liệt kê đúng các file THỰC SỰ có trong repo
-const SHELL_PATHS = [
-  '',                 // -> index.html
-  'index.html',
-  'style.css',
-  'main.js',          // đổi đúng tên file JS của bạn
-  'manifest.webmanifest',
-  'sw.js',
-  'icon-512.png'
+// @version v1.1.1 (2025-10-25): bump cache to refresh updated assets
+const CACHE_NAME = "webllm-shell-v3";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./style.css",
+  "./main.js",
+  "./manifest.webmanifest",
 ];
 
-// Chuyển thành URL đầy đủ
-const APP_SHELL = SHELL_PATHS.map(p => new URL(p, BASE).toString());
-
-self.addEventListener('install', (e) => {
-  e.waitUntil((async () => {
-    const cache = await caches.open(CACHE);
-    // Cache từng file, nếu file nào 404 thì bỏ qua (để không fail cả addAll)
-    for (const url of APP_SHELL) {
-      try {
-        const res = await fetch(url, { cache: 'no-cache' });
-        if (res.ok) await cache.put(url, res.clone());
-        else console.warn('[SW] Skip caching (HTTP ' + res.status + '):', url);
-      } catch (err) {
-        console.warn('[SW] Skip caching (fetch error):', url, err);
-      }
-    }
-  })());
+self.addEventListener("install", (e)=>{
+  e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS)));
 });
 
-self.addEventListener('activate', (e) => {
+self.addEventListener("activate", (e)=>{
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k))
+    ))
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  const reqUrl = e.request.url;
-  // App shell: cache-first
-  if (APP_SHELL.includes(reqUrl)) {
-    e.respondWith(
-      caches.match(reqUrl).then(cached => cached || fetch(e.request))
-    );
+self.addEventListener("fetch", (e)=>{
+  const url = new URL(e.request.url);
+
+  // Để WebLLM tự xử lý cache model sharding qua HTTP/IndexedDB.
+  if (/(\bmlc-ai\b|\bhuggingface\b|\bmodel\b|\bweb-llm\b)/i.test(url.hostname + url.pathname)) {
     return;
   }
-  // Khác: network-first (model shard để HTTP cache lo)
-  e.respondWith(
-    fetch(e.request).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(reqUrl, copy));
-      return res;
-    }).catch(() => caches.match(reqUrl))
-  );
+
+  // App shell: cache-first
+  if (e.request.method === "GET") {
+    e.respondWith(
+      caches.match(e.request).then(resp => resp || fetch(e.request).then(r=>{
+        if (url.origin === location.origin) {
+          const rClone = r.clone();
+          caches.open(CACHE_NAME).then(c=>c.put(e.request, rClone));
+        }
+        return r;
+      }).catch(()=>caches.match("./index.html")))
+    );
+  }
 });
