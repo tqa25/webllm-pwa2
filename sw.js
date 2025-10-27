@@ -1,5 +1,5 @@
-// Very small PWA shell cache (do NOT cache model shards)
-const CACHE_NAME = "webllm-shell-v1";
+// @version v1.1.1 (2025-10-25): bump cache to refresh updated assets
+const CACHE_NAME = "webllm-shell-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,9 +9,7 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", (e)=>{
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS))
-  );
+  e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS)));
 });
 
 self.addEventListener("activate", (e)=>{
@@ -25,16 +23,15 @@ self.addEventListener("activate", (e)=>{
 self.addEventListener("fetch", (e)=>{
   const url = new URL(e.request.url);
 
-  // Bỏ qua các request model shard/huggingface/mlc-ai… để WebLLM + HTTP cache tự xử lý
+  // Để WebLLM tự xử lý cache model sharding qua HTTP/IndexedDB.
   if (/(\bmlc-ai\b|\bhuggingface\b|\bmodel\b|\bweb-llm\b)/i.test(url.hostname + url.pathname)) {
-    return; // network as-is
+    return;
   }
 
-  // Cache-first cho app shell
+  // App shell: cache-first
   if (e.request.method === "GET") {
     e.respondWith(
       caches.match(e.request).then(resp => resp || fetch(e.request).then(r=>{
-        // optional: only cache same-origin
         if (url.origin === location.origin) {
           const rClone = r.clone();
           caches.open(CACHE_NAME).then(c=>c.put(e.request, rClone));
