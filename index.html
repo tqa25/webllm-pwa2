@@ -1,21 +1,19 @@
 <!doctype html>
 <html lang="vi">
 <head>
+  <!-- @version v1.1.1 (2025-10-25): fix mobile sidebar toggle, strengthen debug log hooks -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>WebLLM PWA — Chat</title>
 
-  <!-- PWA -->
   <link rel="manifest" href="./manifest.webmanifest" />
   <meta name="theme-color" content="#0f172a" />
-
-  <!-- Base styles -->
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <div id="app" class="app">
-    <!-- Sidebar / Header -->
-    <aside class="sidebar">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
       <div class="brand">
         <div class="dot"></div>
         <div>
@@ -61,9 +59,13 @@
       </div>
     </aside>
 
+    <!-- Backdrop for mobile -->
+    <div id="backdrop" class="backdrop"></div>
+
     <!-- Chat area -->
     <main class="main">
       <header class="topbar">
+        <button id="btnMenu" class="btn icon only-mobile" aria-label="Menu">☰</button>
         <div class="chip" id="loadedModel">Chưa nạp model</div>
         <div class="inline-stats" id="usageStats"></div>
       </header>
@@ -80,10 +82,7 @@
     </main>
   </div>
 
-  <!-- Main script -->
   <script type="module" src="./main.js"></script>
-
-  <!-- Minimal SW register (relative path for correct scope) -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
