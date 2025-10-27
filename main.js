@@ -1,15 +1,18 @@
-// WebLLM ESM import
+// @version v1.1.1 (2025-10-25): stronger global debug log, clear BUSY state, solid mobile sidebar toggling, dark-bubble safe
 import * as webllm from "https://esm.run/@mlc-ai/web-llm";
 
+const VERSION = "v1.1.1";
 const $ = (q) => document.querySelector(q);
+
 const appState = {
   engine: null,
   abortCtrl: null,
-  messages: [],    // {role:'user'|'assistant'|'system', content:string}
+  messages: [],
   loadedModelId: null,
+  busy: false
 };
 
-// ---------- UI refs ----------
+// ---- UI refs ----
 const selModel = $("#modelSelect");
 const btnInit = $("#btnInit");
 const btnRelease = $("#btnRelease");
@@ -28,123 +31,112 @@ const messagesEl = $("#messages");
 const inputEl = $("#input");
 const btnSend = $("#btnSend");
 const btnStop = $("#btnStop");
+const btnMenu = $("#btnMenu");
+const backdrop = $("#backdrop");
 
-// ---------- Helpers ----------
+// ---- Helpers ----
 function setBadge(text, tone="gray"){
   statusBadge.textContent = text;
   statusBadge.className = "badge " + tone;
 }
-function setChip(text){
-  loadedModelChip.textContent = text;
-}
-function appendLog(line){
-  logEl.textContent += (line + "\n");
+function setChip(t){ loadedModelChip.textContent = t; }
+function pad2(n){ return String(n).padStart(2,"0"); }
+function ts(){ const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; }
+function logEvent(scope, msg){
+  logEl.textContent += `[${ts()}] ${scope} — ${msg}\n`;
   logEl.scrollTop = logEl.scrollHeight;
 }
 function saveHistory(){
   localStorage.setItem("webllm_chat_history", JSON.stringify(appState.messages));
   localStorage.setItem("webllm_loaded_model", appState.loadedModelId || "");
+  localStorage.setItem("webllm_version", VERSION);
 }
 function loadHistory(){
   try{
     const m = JSON.parse(localStorage.getItem("webllm_chat_history")||"[]");
     if(Array.isArray(m)) appState.messages = m;
     appState.loadedModelId = localStorage.getItem("webllm_loaded_model") || null;
-  }catch(e){}
+  }catch{}
 }
 function renderMessages(){
   messagesEl.innerHTML = "";
   for(const msg of appState.messages){
-    const el = document.createElement("div");
-    el.className = "msg " + (msg.role === "user" ? "user" : "assistant");
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    avatar.textContent = msg.role === "user" ? "U" : "A";
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.innerHTML = formatMarkdownBasic(msg.content);
-    el.append(avatar,bubble);
-    messagesEl.append(el);
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + (msg.role === "user" ? "user" : "assistant");
+    const avatar = Object.assign(document.createElement("div"), { className:"avatar", textContent: (msg.role==="user"?"U":"A") });
+    const bubble = Object.assign(document.createElement("div"), { className:"bubble", innerHTML: formatMD(msg.content) });
+    wrap.append(avatar,bubble);
+    messagesEl.append(wrap);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
-function formatMarkdownBasic(text){
-  // very small MD: code block ``` ```
-  const fenced = text.replace(/```([\s\S]*?)```/g, (_,code) => {
-    return `<pre class="code">${escapeHtml(code)}</pre>`;
-  });
-  // inline code
-  const inline = fenced.replace(/`([^`]+)`/g, (_,code)=>`<code class="code">${escapeHtml(code)}</code>`);
-  // paragraphs
-  return inline.replace(/\n\n+/g, "<br/><br/>").replace(/\n/g,"<br/>");
+function formatMD(t){
+  const fenced = t.replace(/```([\s\S]*?)```/g, (_,c)=>`<pre class="code">${escapeHtml(c)}</pre>`);
+  const inline = fenced.replace(/`([^`]+)`/g, (_,c)=>`<code class="code">${escapeHtml(c)}</code>`);
+  return inline.replace(/\n\n+/g,"<br/><br/>").replace(/\n/g,"<br/>");
 }
-function escapeHtml(s){ return s.replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m])); }
+const escapeHtml = (s)=>s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+function setProgress(v, label){ progressEl.value = v ?? 0; progressText.textContent = label || ""; }
+function ensureTheme(){ const t = localStorage.getItem("theme") || "dark"; document.body.classList.toggle("light", t==="light"); }
+function toggleTheme(){ const next = document.body.classList.contains("light")?"dark":"light"; localStorage.setItem("theme", next); ensureTheme(); }
 
-function setProgress(v, label){
-  progressEl.value = v ?? 0;
-  progressText.textContent = label || "";
-}
+// ---- Mobile sidebar ----
+function openSidebar(){ document.body.classList.add("sidebar-open"); }
+function closeSidebar(){ document.body.classList.remove("sidebar-open"); }
+btnMenu?.addEventListener("click", openSidebar);
+backdrop?.addEventListener("click", closeSidebar);
 
-function ensureTheme(){
-  const t = localStorage.getItem("theme") || "dark";
-  document.body.classList.toggle("light", t==="light");
-}
-function toggleTheme(){
-  const cur = document.body.classList.contains("light") ? "light":"dark";
-  const next = cur === "light" ? "dark":"light";
-  localStorage.setItem("theme", next);
-  ensureTheme();
-}
-
-// ---------- WebGPU check ----------
+// ---- WebGPU check (MDN: navigator.gpu / requestAdapter) ----
 async function ensureWebGPU(){
-  if(!("gpu" in navigator)) {
-    throw new Error("Trình duyệt không hỗ trợ WebGPU. Hãy dùng Chrome/Edge mới và bật WebGPU.");
-  }
+  if(!("gpu" in navigator)) throw new Error("Trình duyệt không hỗ trợ WebGPU.");
   const adapter = await navigator.gpu.requestAdapter();
   if(!adapter) throw new Error("Không lấy được GPU adapter.");
-  const adapterInfo = await adapter.requestAdapterInfo?.().catch(()=>null);
-  envInfo.textContent = adapterInfo ? `GPU: ${adapterInfo.description || adapterInfo.vendor || "Unknown"}` : "GPU adapter OK";
+  const info = await adapter.requestAdapterInfo?.().catch(()=>null);
+  envInfo.textContent = info ? `GPU: ${info.description || info.vendor || "Unknown"}` : "GPU adapter OK";
 }
 
-// ---------- Engine lifecycle ----------
-function bindProgress(engine){
-  engine.setInitProgressCallback((r)=>{
-    if (r?.progress != null) setProgress(r.progress, r.text || "");
-    if (r?.text) appendLog(r.text);
-  });
-}
-
+// ---- Engine lifecycle (WebLLM basic usage + init progress) ----
 async function initEngine(){
   try{
+    logEvent("ENGINE","Init yêu cầu");
     setBadge("Đang kiểm tra WebGPU...", "gray");
     await ensureWebGPU();
+
     setBadge("Khởi tạo...", "gray");
     if (!appState.engine){
-      appState.engine = new webllm.MLCEngine();
-      bindProgress(appState.engine);
+      appState.engine = new webllm.MLCEngine({
+        initProgressCallback: (r)=>{
+          if (r?.progress != null) setProgress(r.progress, r.text || "");
+          if (r?.text) logEvent("LOAD", r.text);
+        }
+      });
+      logEvent("ENGINE","Tạo MLCEngine");
     }
     const modelId = selModel.value;
     setChip(`Đang nạp: ${modelId}`);
-    appendLog(`reload(${modelId}) ...`);
-    await appState.engine.reload(modelId, {});
+    logEvent("ENGINE", `reload(${modelId}) bắt đầu`);
+    await appState.engine.reload(modelId, {});    // WebLLM: reload model
     appState.loadedModelId = modelId;
     setBadge("Đã nạp model","green");
     setChip(`Đã nạp: ${modelId}`);
     setProgress(1,"Hoàn tất");
+    logEvent("ENGINE", `reload(${modelId}) hoàn tất`);
     saveHistory();
+    closeSidebar(); // auto ẩn trên mobile
   }catch(err){
     setBadge("Lỗi khởi tạo", "gray");
     setChip("Chưa nạp model");
     setProgress(0, String(err.message || err));
-    appendLog("ERROR: " + (err.message || err));
+    logEvent("ERROR","Init failed: " + (err.message || err));
   }
 }
 
 async function releaseEngine(){
   try{
     if (appState.engine){
+      logEvent("ENGINE","unload() bắt đầu");
       await appState.engine.unload();
+      logEvent("ENGINE","unload() hoàn tất");
     }
     appState.loadedModelId = null;
     setBadge("Đã giải phóng","gray");
@@ -152,44 +144,40 @@ async function releaseEngine(){
     setProgress(0,"Đã giải phóng");
     saveHistory();
   }catch(e){
-    appendLog("Unload error: " + (e.message || e));
+    logEvent("ERROR","Unload error: " + (e.message || e));
   }
 }
 
-// ---------- Chat ----------
-function pushUser(text){
-  appState.messages.push({role:"user", content:text});
-  renderMessages(); saveHistory();
-}
-function pushAssistant(text){
-  appState.messages.push({role:"assistant", content:text});
-  renderMessages(); saveHistory();
-}
-function updateAssistantStreaming(tmpText){
-  // render last assistant message or create temp
+// ---- Chat with streaming + include_usage (WebLLM basic usage) ----
+function pushUser(text){ appState.messages.push({role:"user", content:text}); renderMessages(); saveHistory(); }
+function updateAssistantStreaming(tmp){
   const last = appState.messages[appState.messages.length-1];
-  if (!last || last.role!=="assistant"){
-    appState.messages.push({role:"assistant", content:tmpText});
-  } else {
-    last.content = tmpText;
-  }
-  renderMessages(); // simple full re-render (good enough)
+  if (!last || last.role!=="assistant") appState.messages.push({role:"assistant", content:tmp});
+  else last.content = tmp;
+  renderMessages(); saveHistory();
 }
 
 async function sendMessage(){
   const text = inputEl.value.trim();
   if(!text) return;
   if(!appState.engine || !appState.loadedModelId){
-    appendLog("Hãy nạp model trước.");
+    logEvent("WARN","Gửi khi chưa nạp model");
     return;
   }
+  if (appState.busy){
+    logEvent("WARN","Đang bận, bỏ qua gửi mới");
+    return;
+  }
+
+  appState.busy = true;
   pushUser(text);
-  inputEl.value = "";
-  inputEl.style.height = "auto";
+  inputEl.value = ""; inputEl.style.height = "auto";
 
   appState.abortCtrl = new AbortController();
   const signal = appState.abortCtrl.signal;
-  usageStats.textContent = "Đang tạo phản hồi...";
+  usageStats.textContent = "Đang tạo phản hồi…";
+  setBadge("Đang sinh phản hồi", "green");
+  logEvent("CHAT","Bắt đầu generate");
 
   try{
     const completion = await appState.engine.chat.completions.create({
@@ -202,80 +190,78 @@ async function sendMessage(){
       signal
     });
 
-    let acc = "";
-    let lastUsage = null;
+    let acc = "", lastUsage = null, tick = 0;
     for await (const chunk of completion){
       const delta = chunk?.choices?.[0]?.delta?.content || "";
       if (delta){
         acc += delta;
         updateAssistantStreaming(acc);
+        if ((++tick % 10) === 0) logEvent("STREAM","… nhận thêm token");
       }
-      // usage when available (usually in final chunks)
-      const usage = chunk?.usage;
-      if (usage) lastUsage = usage;
-      // speed stats (non-standard extras if available)
-      const extra = chunk?.extra; // WebLLM demo attaches speeds in .extra; may be null if not provided
+      if (chunk?.usage) lastUsage = chunk.usage;
+      const extra = chunk?.extra;
       if (extra?.perf){
         const { prefill_tokens_per_s, decode_tokens_per_s } = extra.perf;
         usageStats.textContent = `Prefill: ${prefill_tokens_per_s?.toFixed?.(1) || "?"} tok/s · Decode: ${decode_tokens_per_s?.toFixed?.(1) || "?"} tok/s`;
       }
     }
-    // finalize
-    if (acc === ""){
-      // ensure at least an empty assistant message exists
-      updateAssistantStreaming("");
-    }
+    if (acc==="") updateAssistantStreaming("");
+
     if (lastUsage){
       const { prompt_tokens, completion_tokens, total_tokens } = lastUsage;
       usageStats.textContent = `Tokens — prompt: ${prompt_tokens ?? "?"}, completion: ${completion_tokens ?? "?"}, total: ${total_tokens ?? "?"}`;
+      logEvent("CHAT", `Hoàn tất · tokens: p=${prompt_tokens}, c=${completion_tokens}, t=${total_tokens}`);
+    } else {
+      logEvent("CHAT","Hoàn tất (không có usage)");
     }
-    saveHistory();
   }catch(err){
     if (signal.aborted){
       usageStats.textContent = "Đã dừng.";
-      return;
+      logEvent("CHAT","Đã dừng theo yêu cầu");
+    } else {
+      usageStats.textContent = "Lỗi.";
+      logEvent("ERROR","Chat error: " + (err.message || err));
     }
-    appendLog("Chat error: " + (err.message || err));
-    usageStats.textContent = "Lỗi.";
   }finally{
     appState.abortCtrl = null;
+    appState.busy = false;
+    setBadge(appState.loadedModelId ? "Đã nạp model" : "Chưa khởi tạo", appState.loadedModelId ? "green" : "gray");
   }
 }
 
 function stopGeneration(){
-  try{ appState.abortCtrl?.abort(); }catch(e){}
+  try{ appState.abortCtrl?.abort(); }catch(e){ logEvent("ERROR","Abort error: " + (e.message || e)); }
 }
 
-// ---------- Events ----------
+// ---- Events ----
 btnInit.addEventListener("click", initEngine);
 btnRelease.addEventListener("click", releaseEngine);
 btnSend.addEventListener("click", sendMessage);
 btnStop.addEventListener("click", stopGeneration);
 btnNew.addEventListener("click", ()=>{
   appState.messages = [];
-  renderMessages(); saveHistory();
-  usageStats.textContent = "";
+  renderMessages(); saveHistory(); usageStats.textContent = "";
+  logEvent("UI","New Chat");
 });
 btnExport.addEventListener("click", ()=>{
-  const blob = new Blob([JSON.stringify({model:appState.loadedModelId, messages:appState.messages}, null, 2)], {type:"application/json"});
+  const blob = new Blob([JSON.stringify({version:VERSION, model:appState.loadedModelId, messages:appState.messages}, null, 2)], {type:"application/json"});
   const u = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement("a"), {href:u, download:"chat_export.json"});
   a.click(); URL.revokeObjectURL(u);
+  logEvent("UI","Export JSON");
 });
-btnTheme.addEventListener("click", toggleTheme);
+btnTheme.addEventListener("click", ()=>{ toggleTheme(); logEvent("UI","Toggle theme"); });
 btnClearCache.addEventListener("click", ()=>{
   if (confirm("Xoá lịch sử hội thoại?")){
     localStorage.removeItem("webllm_chat_history");
     localStorage.removeItem("webllm_loaded_model");
-    appState.messages = [];
-    appState.loadedModelId = null;
-    renderMessages();
-    setChip("Chưa nạp model");
-    usageStats.textContent = "";
+    appState.messages = []; appState.loadedModelId = null;
+    renderMessages(); setChip("Chưa nạp model"); usageStats.textContent = "";
+    logEvent("UI","Đã xoá lịch sử");
   }
 });
 
-// Auto-resize textarea & Shift+Enter
+// Auto-resize & Enter to send
 inputEl.addEventListener("input", ()=>{
   inputEl.style.height = "auto";
   inputEl.style.height = Math.min(inputEl.scrollHeight, window.innerHeight*0.4) + "px";
@@ -287,24 +273,23 @@ inputEl.addEventListener("keydown", (e)=>{
   }
 });
 
-// ---------- Boot ----------
-ensureTheme();
-loadHistory();
+// ---- Boot ----
+(function boot(){
+  // theme & history
+  ensureTheme(); loadHistory();
 
-// Fill model select from official prebuilt list
-(webllm.prebuiltAppConfig?.model_list || []).forEach(m=>{
-  const opt = document.createElement("option");
-  opt.value = m.model_id;
-  opt.textContent = m.model_id;
-  if (m.model_id === appState.loadedModelId) opt.selected = true;
-  selModel.appendChild(opt);
-});
+  // fill models from official prebuilt list (WebLLM docs)
+  (webllm.prebuiltAppConfig?.model_list || []).forEach(m=>{
+    const opt = document.createElement("option");
+    opt.value = m.model_id; opt.textContent = m.model_id;
+    if (m.model_id === appState.loadedModelId) opt.selected = true;
+    selModel.appendChild(opt);
+  });
 
-renderMessages();
-// show loaded model chip on load
-setChip(appState.loadedModelId ? `Đã nạp: ${appState.loadedModelId}` : "Chưa nạp model");
-
-// Environment info baseline
-envInfo.textContent = "Kiểm tra WebGPU trước khi nạp model...";
-setBadge("Chưa khởi tạo","gray");
-setProgress(0,"Chưa tải");
+  renderMessages();
+  setChip(appState.loadedModelId ? `Đã nạp: ${appState.loadedModelId}` : "Chưa nạp model");
+  envInfo.textContent = `Phiên bản UI: ${VERSION}`;
+  setBadge("Chưa khởi tạo","gray");
+  setProgress(0,"Chưa tải");
+  logEvent("BOOT", `UI ${VERSION} khởi động`);
+})();
